@@ -13,8 +13,11 @@ import {
 } from 'recharts';
 
 const timeframeLabels: Record<Timeframe, string> = {
-  '1d': '1D',
+  '30m': '30m',
+  '1h': '1H',
+  '2h': '2H',
   '4h': '4H',
+  '1d': '1D',
 };
 
 const symbolLabels: Record<SymbolCode, string> = {
@@ -81,7 +84,7 @@ export const CryptoAgentWidget: React.FC = () => {
             ))}
           </div>
           <div className="inline-flex rounded-full bg-slate-900/80 p-1 border border-slate-700/60">
-            {(['4h', '1d'] as Timeframe[]).map((tf) => (
+            {(['30m', '1h', '2h', '4h', '1d'] as Timeframe[]).map((tf) => (
               <button
                 key={tf}
                 onClick={() => setTimeframe(tf)}

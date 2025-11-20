@@ -1,4 +1,4 @@
-export type Timeframe = '1d' | '4h';
+export type Timeframe = '30m' | '1h' | '2h' | '4h' | '1d';
 
 export interface Candle {
   openTime: number;
@@ -12,8 +12,11 @@ export interface Candle {
 const BASE_URL = 'https://api.binance.com/api/v3/klines';
 
 const intervalMap: Record<Timeframe, string> = {
-  '1d': '1d',
+  '30m': '30m',
+  '1h': '1h',
+  '2h': '2h',
   '4h': '4h',
+  '1d': '1d',
 };
 
 export async function fetchCandles(
