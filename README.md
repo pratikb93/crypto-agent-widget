@@ -1,4 +1,4 @@
-# Crypto Agent AGI
+# Market Watch AI
 
 A next-generation crypto market tracking widget powered by simulated AGI capabilities.
 
