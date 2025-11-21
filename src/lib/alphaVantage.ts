@@ -17,12 +17,36 @@ interface AvSeriesResponse {
   series: AvTimeSeriesPoint[];
 }
 
+export interface AvSymbolMatch {
+  symbol: string;
+  name: string;
+}
+
 function getApiKey(): string {
   const key = import.meta.env.VITE_ALPHA_VANTAGE_KEY as string | undefined;
   if (!key) {
     throw new Error('Alpha Vantage API key missing. Set VITE_ALPHA_VANTAGE_KEY in your .env file.');
   }
   return key;
+}
+
+export async function searchBestSymbol(query: string): Promise<AvSymbolMatch | null> {
+  const apiKey = getApiKey();
+  const url = `${AV_BASE_URL}?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(query)}&apikey=${apiKey}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    return null;
+  }
+  const json = await res.json();
+  const matches: any[] | undefined = json['bestMatches'];
+  if (!matches || matches.length === 0) {
+    return null;
+  }
+  const best = matches[0];
+  return {
+    symbol: best['1. symbol'] ?? query.toUpperCase(),
+    name: best['2. name'] ?? best['1. symbol'] ?? query,
+  };
 }
 
 export async function fetchIntradaySeries(symbol: string): Promise<AvSeriesResponse> {

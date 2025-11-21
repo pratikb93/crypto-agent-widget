@@ -1,8 +1,6 @@
-import { useEffect, useState } from 'react';
-import { fetchCandles, type Candle, type Timeframe } from '../lib/api';
+import { useEffect, useState, useCallback } from 'react';
+import { fetchCandles, fetchProfile, fetchNews, searchSymbols, type Candle, type Timeframe, type AssetProfile, type SearchResult, type NewsItem } from '../lib/api';
 import { computeRsi, computeMacd, computeMa, extractCloses } from '../lib/indicators';
-
-export type SymbolCode = 'BTCUSDT' | 'ETHUSDT';
 
 export interface IndicatorSnapshot {
   lastPrice: number | null;
@@ -16,10 +14,12 @@ export interface IndicatorSnapshot {
 }
 
 export interface AgentState {
-  symbol: SymbolCode;
+  symbol: string;
   timeframe: Timeframe;
   candles: Candle[];
   indicators: IndicatorSnapshot | null;
+  profile: AssetProfile | null;
+  news: NewsItem[];
   loading: boolean;
   error: string | null;
 }
@@ -47,18 +47,16 @@ function deriveSignal(snapshot: IndicatorSnapshot): 'BUY' | 'SELL' | 'NEUTRAL' {
   return 'NEUTRAL';
 }
 
-export function useCryptoAgent(initialSymbol: SymbolCode, initialTimeframe: Timeframe): {
-  state: AgentState;
-  setSymbol: (s: SymbolCode) => void;
-  setTimeframe: (t: Timeframe) => void;
-} {
-  const [symbol, setSymbol] = useState<SymbolCode>(initialSymbol);
+export function useCryptoAgent(initialSymbol: string, initialTimeframe: Timeframe) {
+  const [symbol, setSymbol] = useState<string>(initialSymbol);
   const [timeframe, setTimeframe] = useState<Timeframe>(initialTimeframe);
   const [state, setState] = useState<AgentState>({
     symbol: initialSymbol,
     timeframe: initialTimeframe,
     candles: [],
     indicators: null,
+    profile: null,
+    news: [],
     loading: true,
     error: null,
   });
@@ -67,9 +65,18 @@ export function useCryptoAgent(initialSymbol: SymbolCode, initialTimeframe: Time
     let cancelled = false;
 
     async function reasonAndAct() {
-      setState((prev) => ({ ...prev, loading: true, error: null, symbol, timeframe }));
+      // Don't set loading to true on every refresh, only if it's a symbol/timeframe change
+      // But here we can just keep it simple or optimize later.
+      // For now, let's not flicker loading state on auto-refresh if we already have data
+      // setState((prev) => ({ ...prev, loading: true, error: null, symbol, timeframe }));
+
       try {
-        const candles = await fetchCandles(symbol, timeframe, 300);
+        const [candles, profile, news] = await Promise.all([
+          fetchCandles(symbol, timeframe),
+          fetchProfile(symbol),
+          fetchNews(symbol)
+        ]);
+
         if (cancelled) return;
 
         const closes = extractCloses(candles);
@@ -97,39 +104,46 @@ export function useCryptoAgent(initialSymbol: SymbolCode, initialTimeframe: Time
           signal: 'NEUTRAL',
         };
 
-        const signal = deriveSignal(snapshot);
-        snapshot.signal = signal;
+        snapshot.signal = deriveSignal(snapshot);
 
         setState({
           symbol,
           timeframe,
           candles,
           indicators: snapshot,
+          profile,
+          news,
           loading: false,
           error: null,
         });
       } catch (err: any) {
         if (cancelled) return;
-        setState((prev) => ({
-          ...prev,
-          loading: false,
-          error: err?.message ?? 'Failed to update agent',
-        }));
+        console.error(err);
+        setState((prev) => ({ ...prev, loading: false, error: err.message || 'Failed to fetch data' }));
       }
     }
 
+    setState((prev) => ({ ...prev, loading: true, error: null }));
     reasonAndAct();
-    const id = setInterval(reasonAndAct, REFRESH_MS);
 
+    const interval = setInterval(reasonAndAct, REFRESH_MS);
     return () => {
       cancelled = true;
-      clearInterval(id);
+      clearInterval(interval);
     };
   }, [symbol, timeframe]);
+
+  const search = useCallback(async (query: string) => {
+    const res = await searchSymbols(query);
+    return res;
+  }, []);
 
   return {
     state,
     setSymbol,
     setTimeframe,
+    search,
   };
 }
+
+
